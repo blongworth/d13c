@@ -1,0 +1,175 @@
+---
+title: "d13c precision"
+output:
+  html_document:
+    df_print: paged
+---
+
+This notebook looks at historical d13C data for known-value samples. The intent is to look at the precision and accuracy of d13C over time.
+
+## Initial goals
+
+* Estimate the overall precision of d13C analysis at NOSAMS
+* Investigate changes in precision over time
+* Is there a difference between the Optima and Prism
+* Is there a difference by sample type
+* How does sample size affect precision and accuracy?
+
+
+## Data
+
+Initially, we can use the standards dataset that I generate daily. I suspect we'll need to add additional fields (instrument, etc...). We'll also need a custom query to pull older data to look at changes in d13C data since the lab started.
+
+Where's best for the datasets we use? I prefer to keep data off of github, so maybe depositing the data on the share drive and importing it to people's local folders? Alternatively, if people are set up to access the NOSAMS DB, we can use a script to update data.
+
+## Initial exploration
+
+load libraries
+
+```{r}
+library(amstools)
+library(tidyverse)
+library(skimr)
+library(glue)
+library(odbc)
+```
+
+Load data. `std` is the one we want to work with.
+
+```{r}
+load("qcData.rda")
+```
+
+How much c13 do we have?
+
+```{r}
+#str(std)
+length(std$dc13)
+```
+
+OK, so every standard has a d13c. We know that not every standard gets one run, so these must be assigned by type?
+
+```{r}
+db <- conNOSAMS()
+#dbListTables(db)
+#dbListFields(db, "organic_carbon")
+#dbListFields(db, "inorganic_carbon")
+```
+
+Looks like this is stored in the process tables. Ick.
+
+So, let's start from rec_nums that are in the standards table, and then pull relevant corresponding data from the process tables.
+
+
+```{r}
+# Use amstools to get the standards table
+standards <- getStdTable()
+
+# a function to grab data for a list of rec_nums from the gs table
+get13c <- function(type, recnums) {
+  table <- switch (type,
+                   "oc" = "organic_carbon",
+                   "hy" = "inorganic_carbon",
+                   "ws" = "water_strip",
+                   "gs" = "gas_sample"
+  )
+  
+  db <- conNOSAMS()
+  
+  query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, {type}_date, {type}_rd, {type}_dc_13, {type}_dc13_src"),
+                    "FROM {`table`}
+                    WHERE rec_num IN ({recnums*})",
+                    glue("AND {type}_dc_13 IS NOT NULL")),
+                    .con = db)
+  recs <- odbc::dbSendQuery(db, query)
+  data <- odbc::dbFetch(recs)
+  odbc::dbClearResult(recs)
+  data
+}
+
+data <- map_dfr(list("hy", "gs"), get13c, standards$rec_num)
+```
+
+Unfortunately, fields are named differently in all of the process tables, so this function to get everything at once won't work. Bleah.
+
+Let's look at 149823, and OX-I
+
+```{r}
+filter(data, rec_num == 149823) %>%
+ggplot(aes(gs_date, gs_dc_13)) +
+  geom_point()
+```
+
+Clearly a few outliers.  Given the ratios, I think they're mislabels or something. Let's remove them and those really early points and get a mean and sd.
+
+```{r}
+data %>%
+  filter(rec_num == 149823,
+         gs_date > "2019-01-01",
+         gs_dc_13 < -15,
+         gs_dc_13 > -20) %>%
+  summarize(d13c.m = mean(gs_dc_13),
+          d13c.sd = sd(gs_dc_13))
+```
+
+0.06 permil. Not bad.
+
+Let's try and look at all the OX-I bulbs. I'm lazy so I'm doing this by 13C rather than by picking OX-I rec_nums.
+
+```{r}
+data %>%
+  #filter(gs_dc_13 < -15,
+  #       gs_dc_13 > -23) %>%
+  ggplot(aes(gs_date, gs_dc_13, color = as.factor(rec_num))) +
+           geom_jitter()
+```
+
+Well, that's not going to work. How about picking rec_nums with a consensus fm of 1.0398 (ox-I).
+
+```{r}
+
+oxstd <- standards %>%
+  filter(fm_consensus == 1.0398) %>%
+  select(rec_num)
+
+ox <- data %>%
+  filter(rec_num %in% oxstd$rec_num,
+         gs_dc_13 < -10) 
+
+ox %>%
+  ggplot(aes(gs_date, gs_dc_13, color = as.factor(gs_dc13_src))) +
+           geom_jitter()
+```
+
+And the summary for all things that are supposed to be OX-I
+
+```{r}
+ox %>%
+  summarize(d13c.m = mean(gs_dc_13),
+          d13c.sd = sd(gs_dc_13))
+
+```
+
+Might be better to look at this by rec_num.
+
+```{r}
+ox %>%
+  ggplot(aes(as.factor(rec_num), gs_dc_13, color = as.factor(gs_dc13_src))) +
+           geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+  
+ox %>%
+  group_by(rec_num, gs_dc13_src) %>%
+  summarize(d13c.m = mean(gs_dc_13),
+          d13c.sd = sd(gs_dc_13))
+  
+```
+
+## Organics
+
+Let's do the same for OX-I solid. Really, I just need to write something to get all the data at once.
+
+```{r}
+
+```
+
