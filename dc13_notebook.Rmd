@@ -52,8 +52,10 @@ OK, so every standard has a d13c. We know that not every standard gets one run, 
 ```{r}
 db <- conNOSAMS()
 #dbListTables(db)
-#dbListFields(db, "organic_carbon")
-#dbListFields(db, "inorganic_carbon")
+dbListFields(db, "organic_carbon")
+dbListFields(db, "inorganic_carbon")
+dbListFields(db, "water_strip")
+dbGetQuery(db, "select * from water_strip where rec_num = 1082")
 ```
 
 Looks like this is stored in the process tables. Ick.
@@ -75,19 +77,35 @@ get13c <- function(type, recnums) {
   )
   
   db <- conNOSAMS()
-  
-  query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, {type}_date, {type}_rd, {type}_dc_13, {type}_dc13_src"),
-                    "FROM {`table`}
-                    WHERE rec_num IN ({recnums*})",
-                    glue("AND {type}_dc_13 IS NOT NULL")),
-                    .con = db)
+  if (type %in% c("hy", "gs")) {
+    query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, {type}_date AS date, 
+                                 {type}_rd AS rd, {type}_dc_13 AS d13c, {type}_dc13_src AS irms"),
+                            "FROM {`table`}
+                            WHERE rec_num IN ({recnums*})",
+                            glue("AND {type}_dc_13 IS NOT NULL")),
+                      .con = db)
+  } else if (type == "oc") {
+    query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, date_run AS date, 
+                                 oc_devel AS rd, {type}_dc_13 AS d13c, {type}_dc13_src AS irms"),
+                            "FROM {`table`}
+                            WHERE rec_num IN ({recnums*})",
+                            glue("AND {type}_dc_13 IS NOT NULL")),
+                      .con = db)
+  } else if (type == "ws") {
+    query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, {type}_strip_date AS date, 
+                                 {type}_r_d AS rd, {type}_delta_c13 AS d13c, {type}_dc13_from AS irms"),
+                            "FROM {`table`}
+                            WHERE rec_num IN ({recnums*})",
+                            glue("AND {type}_delta_c13 IS NOT NULL")),
+                      .con = db)
+  }
   recs <- odbc::dbSendQuery(db, query)
   data <- odbc::dbFetch(recs)
   odbc::dbClearResult(recs)
   data
 }
 
-data <- map_dfr(list("hy", "gs"), get13c, standards$rec_num)
+data <- map_dfr(list("hy", "gs", "oc", "ws"), get13c, standards$rec_num)
 ```
 
 Unfortunately, fields are named differently in all of the process tables, so this function to get everything at once won't work. Bleah.
@@ -171,5 +189,14 @@ Let's do the same for OX-I solid. Really, I just need to write something to get 
 
 ```{r}
 
+```
+
+
+# Get data from files
+
+Pausing on getting 13C data from DB for a minute. Al's spreadsheet irms data are available on the share drive.
+
+```{r}
+dir <- file.path("//fileshare.whoi.edu/whoi/dept/gg/nosams/arg/")
 ```
 
