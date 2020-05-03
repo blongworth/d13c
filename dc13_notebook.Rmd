@@ -30,91 +30,92 @@ load libraries
 library(amstools)
 library(tidyverse)
 library(skimr)
-library(glue)
 library(odbc)
 ```
 
-Load data. `std` is the one we want to work with.
+So, let's start from rec_nums that are in the standards table, and then pull relevant corresponding data from the process tables. This has been transferred to get_d13c_data.R...
+
 
 ```{r}
-load("qcData.rda")
+load("data/NOSAMS_d13c.rda")
+
+skim(data)
+
+unique(data$irms)
+
+ggplot(data, aes(date, d13c)) +
+  geom_point()
 ```
 
-How much c13 do we have?
+Looking for something we've run for a long time...
+
+What;s that sample at -10 permil?
 
 ```{r}
-#str(std)
-length(std$dc13)
+  data %>% filter(d13c > -11, d13c < -9) %>%
+  group_by(rec_num, name) %>%
+  summarise(n())
 ```
 
-OK, so every standard has a d13c. We know that not every standard gets one run, so these must be assigned by type?
+Some randos, but mostly 17185, which is TIRI-I. I'll come back and look at the flyers later- maybe mislabels?
+
 
 ```{r}
-db <- conNOSAMS()
-#dbListTables(db)
-dbListFields(db, "organic_carbon")
-dbListFields(db, "inorganic_carbon")
-dbListFields(db, "water_strip")
-dbGetQuery(db, "select * from water_strip where rec_num = 1082")
+tirii <- data %>%
+  filter(rec_num == 17185)
+
+skim(tirii)
 ```
 
-Looks like this is stored in the process tables. Ick.
+```{r}
+ggplot(tirii, aes(date, d13c)) +
+  geom_point()
+```
 
-So, let's start from rec_nums that are in the standards table, and then pull relevant corresponding data from the process tables.
-
+Without outliers...
 
 ```{r}
-# Use amstools to get the standards table
-standards <- getStdTable()
+ggplot(tirii, aes(date, d13c, color = irms)) +
+  geom_point() +
+  ylim(-13, -7)
 
-# a function to grab data for a list of rec_nums from the gs table
-get13c <- function(type, recnums) {
-  table <- switch (type,
-                   "oc" = "organic_carbon",
-                   "hy" = "inorganic_carbon",
-                   "ws" = "water_strip",
-                   "gs" = "gas_sample"
-  )
+tirii <- tirii %>%
+  filter( irms == "O" | irms == "P")
+
+tirii_no <- tirii %>%
+  filter(!is.na(removeOutliers(d13c)))
+        
   
-  db <- conNOSAMS()
-  if (type %in% c("hy", "gs")) {
-    query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, {type}_date AS date, 
-                                 {type}_rd AS rd, {type}_dc_13 AS d13c, {type}_dc13_src AS irms"),
-                            "FROM {`table`}
-                            WHERE rec_num IN ({recnums*})",
-                            glue("AND {type}_dc_13 IS NOT NULL")),
-                      .con = db)
-  } else if (type == "oc") {
-    query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, date_run AS date, 
-                                 oc_devel AS rd, {type}_dc_13 AS d13c, {type}_dc13_src AS irms"),
-                            "FROM {`table`}
-                            WHERE rec_num IN ({recnums*})",
-                            glue("AND {type}_dc_13 IS NOT NULL")),
-                      .con = db)
-  } else if (type == "ws") {
-    query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, {type}_strip_date AS date, 
-                                 {type}_r_d AS rd, {type}_delta_c13 AS d13c, {type}_dc13_from AS irms"),
-                            "FROM {`table`}
-                            WHERE rec_num IN ({recnums*})",
-                            glue("AND {type}_delta_c13 IS NOT NULL")),
-                      .con = db)
-  }
-  recs <- odbc::dbSendQuery(db, query)
-  data <- odbc::dbFetch(recs)
-  odbc::dbClearResult(recs)
-  data
-}
+tirii %>%
+  summarize(d13c.m = mean(d13c),
+            s13c.sd = sd(d13c))
 
-data <- map_dfr(list("hy", "gs", "oc", "ws"), get13c, standards$rec_num)
+tirii_no %>%
+  summarize(d13c.m = mean(d13c),
+            s13c.sd = sd(d13c))
+
+tirii_no %>%
+  ggplot(aes(date, d13c, color = irms)) +
+    geom_point() 
 ```
 
-Unfortunately, fields are named differently in all of the process tables, so this function to get everything at once won't work. Bleah.
+Is there a difference by instrument?
 
-Let's look at 149823, and OX-I
+```{r}
+tirii_no %>%
+  group_by(irms) %>%
+  summarize(d13c.m = mean(d13c),
+            s13c.sd = sd(d13c))
+
+t.test(d13c ~ irms, data = tirii)
+anova(lm(d13c ~ irms, data = tirii))
+```
+
+Let's look at 149823, an OX-I gas.
 
 ```{r}
 filter(data, rec_num == 149823) %>%
-ggplot(aes(gs_date, gs_dc_13)) +
+ggplot(aes(date, d13c)) +
   geom_point()
 ```
 
@@ -123,11 +124,11 @@ Clearly a few outliers.  Given the ratios, I think they're mislabels or somethin
 ```{r}
 data %>%
   filter(rec_num == 149823,
-         gs_date > "2019-01-01",
-         gs_dc_13 < -15,
-         gs_dc_13 > -20) %>%
-  summarize(d13c.m = mean(gs_dc_13),
-          d13c.sd = sd(gs_dc_13))
+         date > "2019-01-01",
+         d13c < -15,
+         d13c > -20) %>%
+  summarize(d13c.m = mean(d13c),
+          d13c.sd = sd(d13c))
 ```
 
 0.06 permil. Not bad.
@@ -136,9 +137,7 @@ Let's try and look at all the OX-I bulbs. I'm lazy so I'm doing this by 13C rath
 
 ```{r}
 data %>%
-  #filter(gs_dc_13 < -15,
-  #       gs_dc_13 > -23) %>%
-  ggplot(aes(gs_date, gs_dc_13, color = as.factor(rec_num))) +
+  ggplot(aes(date, d13c, color = as.factor(rec_num))) +
            geom_jitter()
 ```
 
@@ -151,11 +150,10 @@ oxstd <- standards %>%
   select(rec_num)
 
 ox <- data %>%
-  filter(rec_num %in% oxstd$rec_num,
-         gs_dc_13 < -10) 
+  filter(rec_num %in% oxstd$rec_num)
 
 ox %>%
-  ggplot(aes(gs_date, gs_dc_13, color = as.factor(gs_dc13_src))) +
+  ggplot(aes(date, d13c, color = as.factor(rec_num))) +
            geom_jitter()
 ```
 
@@ -163,8 +161,8 @@ And the summary for all things that are supposed to be OX-I
 
 ```{r}
 ox %>%
-  summarize(d13c.m = mean(gs_dc_13),
-          d13c.sd = sd(gs_dc_13))
+  summarize(d13c.m = mean(d13c),
+          d13c.sd = sd(d13c))
 
 ```
 
@@ -172,14 +170,14 @@ Might be better to look at this by rec_num.
 
 ```{r}
 ox %>%
-  ggplot(aes(as.factor(rec_num), gs_dc_13, color = as.factor(gs_dc13_src))) +
+  ggplot(aes(as.factor(rec_num), d13c, color = as.factor(irms))) +
            geom_boxplot() +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
   
 ox %>%
-  group_by(rec_num, gs_dc13_src) %>%
-  summarize(d13c.m = mean(gs_dc_13),
-          d13c.sd = sd(gs_dc_13))
+  group_by(rec_num, irms) %>%
+  summarize(d13c.m = mean(d13c),
+          d13c.sd = sd(d13c))
   
 ```
 
