@@ -45,11 +45,31 @@ unique(data$irms)
 
 ggplot(data, aes(date, d13c)) +
   geom_point()
+
+data %>%
+ggplot(aes(name, d13c)) +
+  geom_boxplot()
+
+mostrun <- data %>%
+  group_by(rec_num) %>%
+  filter(n() > 1000)
+
+mostrun %>%
+  group_by(rec_num, name) %>%
+  summarize(mean = mean(d13c),
+            sd = sd(d13c))
+
+ggplot(mostrun, aes(name, d13c)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+ggplot(mostrun, aes(date, d13c)) +
+  geom_point() +
+  facet_wrap(vars(name))
 ```
 
 Looking for something we've run for a long time...
 
-What;s that sample at -10 permil?
+What's that sample at -10 permil?
 
 ```{r}
   data %>% filter(d13c > -11, d13c < -9) %>%
