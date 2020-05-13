@@ -1,7 +1,7 @@
 # get data for d13c analysis
 
 library(tidyverse)
-library(odbc)
+library(DBI)
 library(glue)
 library(amstools)
 library(here)
@@ -42,9 +42,9 @@ get13c <- function(type, recnums) {
                             glue("AND {type}_delta_c13 IS NOT NULL")),
                       .con = db)
   }
-  recs <- odbc::dbSendQuery(db, query)
-  data <- odbc::dbFetch(recs)
-  odbc::dbClearResult(recs)
+  recs <- dbSendQuery(db, query)
+  data <- dbFetch(recs)
+  dbClearResult(recs)
   data
 }
 
