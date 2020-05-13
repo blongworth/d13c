@@ -18,7 +18,7 @@ This notebook looks at historical d13C data for known-value samples. The intent 
 
 ## Data
 
-Initially, we can use the standards dataset that I generate daily. I suspect we'll need to add additional fields (instrument, etc...). We'll also need a custom query to pull older data to look at changes in d13C data since the lab started.
+Initially, I'm using d13C data from the process tables. This gives rec_num, date, value, instrument. Need to add at least sample size. Where is the d13C split size recorded? 
 
 Where's best for the datasets we use? I prefer to keep data off of github, so maybe depositing the data on the share drive and importing it to people's local folders? Alternatively, if people are set up to access the NOSAMS DB, we can use a script to update data.
 
@@ -27,29 +27,35 @@ Where's best for the datasets we use? I prefer to keep data off of github, so ma
 load libraries
 
 ```{r}
-library(amstools)
 library(tidyverse)
 library(skimr)
-library(odbc)
+library(amstools)
 ```
 
-So, let's start from rec_nums that are in the standards table, and then pull relevant corresponding data from the process tables. This has been transferred to get_d13c_data.R...
+Let's start from rec_nums that are in the standards table, and then pull relevant corresponding data from the process tables. This has been transferred to get_d13c_data.R...
 
+Load the data and summarize.
 
 ```{r}
 load("data/NOSAMS_d13c.rda")
-
 skim(data)
+```
 
+Look at problems with nonstandard IRMS name and missing date. Remove rows with these issues, along with samples marked R&D.
+
+```{r}
 unique(data$irms)
+unique(data$rd)
 
-ggplot(data, aes(date, d13c)) +
-  geom_point()
+data <- data %>%
+  filter(irms %in% c("O", "P"),
+         !is.na(date),
+         is.na(rd) | rd == 0)
+  ```
 
-data %>%
-ggplot(aes(name, d13c)) +
-  geom_boxplot()
+Find the sample types run the most.
 
+```{r}
 mostrun <- data %>%
   group_by(rec_num) %>%
   filter(n() > 1000)
@@ -57,34 +63,23 @@ mostrun <- data %>%
 mostrun %>%
   group_by(rec_num, name) %>%
   summarize(mean = mean(d13c),
-            sd = sd(d13c))
+            sd = sd(d13c),
+            N = n())
 
-ggplot(mostrun, aes(name, d13c)) +
-  geom_boxplot() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
 ggplot(mostrun, aes(date, d13c)) +
   geom_point() +
   facet_wrap(vars(name))
 ```
 
-Looking for something we've run for a long time...
+There are a lot of outliers that will cloud what the variability for "normal" samples is.
 
-What's that sample at -10 permil?
+## TIRI I
 
-```{r}
-  data %>% filter(d13c > -11, d13c < -9) %>%
-  group_by(rec_num, name) %>%
-  summarise(n())
-```
-
-Some randos, but mostly 17185, which is TIRI-I. I'll come back and look at the flyers later- maybe mislabels?
-
+Look at TIRI-I.
 
 ```{r}
 tirii <- data %>%
   filter(rec_num == 17185)
-
-skim(tirii)
 ```
 
 ```{r}
@@ -92,16 +87,16 @@ ggplot(tirii, aes(date, d13c)) +
   geom_point()
 ```
 
-Without outliers...
+Remove obvious mislabels and problem samples...
 
 ```{r}
 ggplot(tirii, aes(date, d13c, color = irms)) +
   geom_point() +
-  ylim(-13, -7)
+  ylim(-12, -8)
+```
 
-tirii <- tirii %>%
-  filter( irms == "O" | irms == "P")
 
+```{r}
 tirii_no <- tirii %>%
   filter(!is.na(removeOutliers(d13c)))
         
@@ -130,6 +125,8 @@ tirii_no %>%
 t.test(d13c ~ irms, data = tirii)
 anova(lm(d13c ~ irms, data = tirii))
 ```
+
+## OX-I gas
 
 Let's look at 149823, an OX-I gas.
 
