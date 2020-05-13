@@ -51,7 +51,9 @@ get13c <- function(type, recnums) {
 data <- map_dfr(list("hy", "gs", "oc", "ws"), get13c, standards$rec_num)
 
 data <- data %>%
-  mutate(date = as.Date(date)) %>%
+  mutate(date = as.Date(date),
+         rd = factor(rd),
+         irms = factor(irms)) %>%
   inner_join(select(standards, rec_num, name))
 save(list = c("data", "standards"), file = "data/NOSAMS_d13c.rda")
 write_csv(data, here("data/NOSAMS_d13c.csv"))
