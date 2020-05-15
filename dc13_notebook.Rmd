@@ -16,17 +16,16 @@ This notebook looks at historical d13C data for known-value samples. The intent 
 * How does sample size affect precision and accuracy?
 
 
-## Data
+# Data
 
 Initially, I'm using d13C data from the process tables. This gives rec_num, date, value, instrument. Need to add at least sample size. Where is the d13C split size recorded? 
 
 Where's best for the datasets we use? I prefer to keep data off of github, so maybe depositing the data on the share drive and importing it to people's local folders? Alternatively, if people are set up to access the NOSAMS DB, we can use a script to update data.
 
-## Initial exploration
 
 load libraries
 
-```{r}
+```{r, message=F, warning=F}
 library(tidyverse)
 library(skimr)
 library(amstools)
@@ -57,8 +56,8 @@ mostrun <- data %>%
 
 mostrun %>%
   group_by(rec_num, name) %>%
-  summarize(mean = mean(d13c),
-            sd = sd(d13c),
+  summarize("d13C mean" = mean(d13c),
+            "d13C sd" = sd(d13c),
             N = n())
 
 ggplot(mostrun, aes(date, d13c)) +
@@ -79,8 +78,9 @@ tirii <- data %>%
 
 ```{r}
 tirii %>%
-  summarize(d13c.m = mean(d13c),
-            s13c.sd = sd(d13c))
+  summarize("d13C mean" = mean(d13c),
+            "d13C sd" = sd(d13c),
+            N = n())
 
 ggplot(tirii, aes(date, d13c)) +
   geom_point()
@@ -89,7 +89,7 @@ ggplot(tirii, aes(date, d13c)) +
 Remove obvious mislabels and problem samples...
 
 ```{r}
-ggplot(tirii, aes(date, d13c, color = irms)) +
+ggplot(tirii, aes(date, d13c, color = irms, shape = irms)) +
   geom_point() +
   ylim(-12, -8)
 ```
@@ -101,11 +101,12 @@ tirii_no <- tirii %>%
   filter(!is.na(removeOutliers(d13c)))
 
 tirii_no %>%
-  summarize(d13c.m = mean(d13c),
-            s13c.sd = sd(d13c))
+  summarize("d13C mean" = mean(d13c),
+            "d13C sd" = sd(d13c),
+            N = n())
 
 tirii_no %>%
-  ggplot(aes(date, d13c, color = irms)) +
+  ggplot(aes(date, d13c, color = irms, shape = irms)) +
     geom_point() 
 ```
 
@@ -114,10 +115,11 @@ Is there a difference by instrument?
 ```{r}
 tirii_no %>%
   group_by(irms) %>%
-  summarize(d13c.m = mean(d13c),
-            s13c.sd = sd(d13c))
+  summarize("d13C mean" = mean(d13c),
+            "d13C sd" = sd(d13c),
+            N = n())
 
-t.test(d13c ~ irms, data = tirii)
+#t.test(d13c ~ irms, data = tirii)
 anova(lm(d13c ~ irms, data = tirii))
 ```
 
@@ -131,32 +133,32 @@ ggplot(aes(date, d13c)) +
   geom_point()
 ```
 
-Clearly a few outliers.  Given the ratios, I think they're mislabels or something. Let's remove them and those really early points and get a mean and sd.
+Remove obvious mislabels and problem samples...
 
 ```{r}
-data %>%
+ox_no <- data %>%
   filter(rec_num == 149823,
          date > "2019-01-01",
          d13c < -15,
-         d13c > -20) %>%
-  summarize(d13c.m = mean(d13c),
-          d13c.sd = sd(d13c))
+         d13c > -20) 
+
+ox_no %>%
+  summarize("d13C mean" = mean(d13c),
+            "d13C sd" = sd(d13c),
+            N = n())
+
+ox_no %>%
+  ggplot(aes(date, d13c, color = irms, shape = irms)) +
+    geom_point() 
 ```
 
 0.06 permil. Not bad.
 
-Let's try and look at all the OX-I bulbs. I'm lazy so I'm doing this by 13C rather than by picking OX-I rec_nums.
+## All OX-I
+
+Let's try and look at all the OX-I bulbs. Picking rec_nums with a consensus fm of 1.0398 (ox-I).
 
 ```{r}
-data %>%
-  ggplot(aes(date, d13c, color = as.factor(rec_num))) +
-           geom_jitter()
-```
-
-Well, that's not going to work. How about picking rec_nums with a consensus fm of 1.0398 (ox-I).
-
-```{r}
-
 oxstd <- standards %>%
   filter(fm_consensus == 1.0398) %>%
   select(rec_num)
@@ -173,9 +175,9 @@ And the summary for all things that are supposed to be OX-I
 
 ```{r}
 ox %>%
-  summarize(d13c.m = mean(d13c),
-          d13c.sd = sd(d13c))
-
+  summarize("d13C mean" = mean(d13c),
+            "d13C sd" = sd(d13c),
+            N = n())
 ```
 
 Might be better to look at this by rec_num.
@@ -188,25 +190,9 @@ ox %>%
   
 ox %>%
   group_by(rec_num, irms) %>%
-  summarize(d13c.m = mean(d13c),
-          d13c.sd = sd(d13c))
-  
+  summarize("d13C mean" = mean(d13c),
+            "d13C sd" = sd(d13c),
+            N = n())
 ```
 
-## Organics
-
-Let's do the same for OX-I solid. Really, I just need to write something to get all the data at once.
-
-```{r}
-
-```
-
-
-# Get data from files
-
-Pausing on getting 13C data from DB for a minute. Al's spreadsheet irms data are available on the share drive.
-
-```{r}
-dir <- file.path("//fileshare.whoi.edu/whoi/dept/gg/nosams/arg/")
-```
 
