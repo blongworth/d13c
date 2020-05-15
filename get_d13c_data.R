@@ -20,23 +20,30 @@ get13c <- function(type, recnums) {
   )
   
   db <- conNOSAMS()
-  if (type %in% c("hy", "gs")) {
+  if (type == "hy") {
     query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, {type}_date AS date, 
-                                 {type}_rd AS rd, {type}_dc_13 AS d13c, {type}_dc13_src AS irms"),
+                                 {type}_rd AS rd, {type}_dc_13 AS d13c, {type}_c13_yield AS c13qty, {type}_dc13_src AS irms"),
+                            "FROM {`table`}
+                            WHERE rec_num IN ({recnums*})",
+                            glue("AND {type}_dc_13 IS NOT NULL")),
+                      .con = db)
+  } else if (type == "gs") {
+    query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, {type}_date AS date, 
+                                 {type}_rd AS rd, {type}_dc_13 AS d13c, {type}_c13 AS c13qty, {type}_dc13_src AS irms"),
                             "FROM {`table`}
                             WHERE rec_num IN ({recnums*})",
                             glue("AND {type}_dc_13 IS NOT NULL")),
                       .con = db)
   } else if (type == "oc") {
     query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, date_run AS date, 
-                                 oc_devel AS rd, {type}_dc_13 AS d13c, {type}_dc13_src AS irms"),
+                                 oc_devel AS rd, {type}_dc_13 AS d13c, {type}_c13_analysis AS c13qty, {type}_dc13_src AS irms"),
                             "FROM {`table`}
                             WHERE rec_num IN ({recnums*})",
                             glue("AND {type}_dc_13 IS NOT NULL")),
                       .con = db)
   } else if (type == "ws") {
     query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, {type}_strip_date AS date, 
-                                 {type}_r_d AS rd, {type}_delta_c13 AS d13c, {type}_dc13_from AS irms"),
+                                 {type}_r_d AS rd, {type}_delta_c13 AS d13c, {type}_c13 AS c13qty, {type}_dc13_from AS irms"),
                             "FROM {`table`}
                             WHERE rec_num IN ({recnums*})",
                             glue("AND {type}_delta_c13 IS NOT NULL")),
