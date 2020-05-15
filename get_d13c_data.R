@@ -50,9 +50,12 @@ get13c <- function(type, recnums) {
 
 data <- map_dfr(list("hy", "gs", "oc", "ws"), get13c, standards$rec_num)
 
+# Remove bad or empty irms and date, recode rd
 data <- data %>%
+  filter(irms %in% c("O", "P"),
+         !is.na(date)) %>%
   mutate(date = as.Date(date),
-         rd = factor(rd),
+         rd = factor(ifelse(is.na(rd), 0, rd)),
          irms = factor(irms)) %>%
   inner_join(select(standards, rec_num, name))
 save(list = c("data", "standards"), file = "data/NOSAMS_d13c.rda")

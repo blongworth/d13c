@@ -41,17 +41,12 @@ load("data/NOSAMS_d13c.rda")
 skim(data)
 ```
 
-Look at problems with nonstandard IRMS name and missing date. Remove rows with these issues, along with samples marked R&D.
+Remove samples marked r&d
 
 ```{r}
-unique(data$irms)
-unique(data$rd)
-
 data <- data %>%
-  filter(irms %in% c("O", "P"),
-         !is.na(date),
-         is.na(rd) | rd == 0)
-  ```
+  filter(rd == 0)
+```
 
 Find the sample types run the most.
 
@@ -83,6 +78,10 @@ tirii <- data %>%
 ```
 
 ```{r}
+tirii %>%
+  summarize(d13c.m = mean(d13c),
+            s13c.sd = sd(d13c))
+
 ggplot(tirii, aes(date, d13c)) +
   geom_point()
 ```
@@ -95,15 +94,11 @@ ggplot(tirii, aes(date, d13c, color = irms)) +
   ylim(-12, -8)
 ```
 
+Remove outliers by interquartile distance and look at remaining data.
 
 ```{r}
 tirii_no <- tirii %>%
   filter(!is.na(removeOutliers(d13c)))
-        
-  
-tirii %>%
-  summarize(d13c.m = mean(d13c),
-            s13c.sd = sd(d13c))
 
 tirii_no %>%
   summarize(d13c.m = mean(d13c),
