@@ -1,5 +1,7 @@
 # get data for d13c analysis
 
+# TODO: add total sample size (small may fractionate in prep)
+
 library(tidyverse)
 library(DBI)
 library(glue)
@@ -67,3 +69,10 @@ data <- data %>%
   inner_join(select(standards, rec_num, name))
 save(list = c("data", "standards"), file = "data/NOSAMS_d13c.rda")
 write_csv(data, here("data/NOSAMS_d13c.csv"))
+
+# get data from files
+
+#directory for yearly dirs
+dir <- "H://arg/Mass Spec Data"
+
+# Look at quantos script for how to do this...
