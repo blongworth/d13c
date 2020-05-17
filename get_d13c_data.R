@@ -11,6 +11,7 @@ library(here)
 standards <- getStdTable()
 
 # a function to grab data for a list of rec_nums from the gs table
+# this would probably be simpler as 4 separate queries.
 get13c <- function(type, recnums) {
   table <- switch (type,
                    "oc" = "organic_carbon",
@@ -21,29 +22,50 @@ get13c <- function(type, recnums) {
   
   db <- conNOSAMS()
   if (type == "hy") {
-    query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, {type}_date AS date, 
-                                 {type}_rd AS rd, {type}_dc_13 AS d13c, {type}_c13_yield AS c13qty, {type}_dc13_src AS irms"),
+    query <- glue_sql(paste(glue("SELECT 
+                                    {type}_num, rec_num, 
+                                    {type}_date AS date, 
+                                    {type}_rd AS rd, 
+                                    {type}_dc_13 AS d13c, 
+                                    {type}_dc_13 AS d13c, 
+                                    {type}_c13_yield AS c13qty, 
+                                    {type}_co2_yield AS tot_qty, 
+                                    {type}_dc13_src AS irms"),
                             "FROM {`table`}
                             WHERE rec_num IN ({recnums*})",
                             glue("AND {type}_dc_13 IS NOT NULL")),
                       .con = db)
   } else if (type == "gs") {
-    query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, {type}_date AS date, 
-                                 {type}_rd AS rd, {type}_dc_13 AS d13c, {type}_c13 AS c13qty, {type}_dc13_src AS irms"),
+    query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, 
+                                    {type}_date AS date, 
+                                    {type}_rd AS rd, 
+                                    {type}_dc_13 AS d13c, 
+                                    {type}_c13 AS c13qty, 
+                                    {type}_co2_yield AS tot_qty, 
+                                    {type}_dc13_src AS irms"),
                             "FROM {`table`}
                             WHERE rec_num IN ({recnums*})",
                             glue("AND {type}_dc_13 IS NOT NULL")),
                       .con = db)
   } else if (type == "oc") {
-    query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, date_run AS date, 
-                                 oc_devel AS rd, {type}_dc_13 AS d13c, {type}_c13_analysis AS c13qty, {type}_dc13_src AS irms"),
+    query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, 
+                                    date_run AS date, 
+                                    oc_devel AS rd, {type}_dc_13 AS d13c, 
+                                    {type}_c13_analysis AS c13qty, 
+                                    {type}_co2_yield AS tot_qty, 
+                                    {type}_dc13_src AS irms"),
                             "FROM {`table`}
                             WHERE rec_num IN ({recnums*})",
                             glue("AND {type}_dc_13 IS NOT NULL")),
                       .con = db)
   } else if (type == "ws") {
-    query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, {type}_strip_date AS date, 
-                                 {type}_r_d AS rd, {type}_delta_c13 AS d13c, {type}_c13 AS c13qty, {type}_dc13_from AS irms"),
+    query <- glue_sql(paste(glue("SELECT {type}_num, rec_num, 
+                                    {type}_strip_date AS date, 
+                                    {type}_r_d AS rd, 
+                                    {type}_delta_c13 AS d13c, 
+                                    {type}_c13 AS c13qty, 
+                                    {type}_co2_yield AS tot_qty, 
+                                    {type}_dc13_from AS irms"),
                             "FROM {`table`}
                             WHERE rec_num IN ({recnums*})",
                             glue("AND {type}_delta_c13 IS NOT NULL")),
