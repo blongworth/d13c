@@ -31,8 +31,6 @@ library(skimr)
 library(amstools)
 ```
 
-Let's start from rec_nums that are in the standards table, and then pull relevant corresponding data from the process tables. This has been transferred to get_d13c_data.R...
-
 Load the data and summarize.
 
 ```{r}
@@ -93,6 +91,34 @@ ggplot(tirii, aes(date, d13c, color = irms, shape = irms)) +
   geom_point() +
   ylim(-12, -8)
 ```
+
+Plot by size of 13C split
+
+```{r}
+ggplot(tirii, aes(c13qty, d13c, color = irms, shape = irms)) +
+  geom_point() +
+  ylim(-12, -8) +
+  xlim(0, 30)
+```
+
+Plot by total sample size (yield)
+
+```{r}
+ggplot(tirii, aes(tot_qty, d13c, color = irms, shape = irms)) +
+  geom_point() +
+  ylim(-12, -8) +
+  xlim(0, 300)
+```
+
+Size of 13C split vs size of sample
+
+```{r}
+ggplot(tirii, aes(tot_qty, c13qty, color = irms, shape = irms)) +
+  geom_point() +
+  xlim(0, 300) +
+  ylim(0, 30)
+```
+
 
 Remove outliers by interquartile distance and look at remaining data.
 
