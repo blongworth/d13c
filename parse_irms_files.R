@@ -6,7 +6,7 @@ library(janitor)
 
 #directory for yearly dirs
 top_dir_path <- "H://arg/"
-files <- dir(path = top_dir_path, full.names = TRUE, recursive = FALSE, pattern = "[optima|PRISM]\\d{2}.xlsx")
+files <- dir(path = top_dir_path, full.names = TRUE, recursive = FALSE, pattern = "(optima|PRISM)\\d{2}.xlsx")
 str(files)
 
 # read and parse a single file
@@ -32,7 +32,8 @@ read_xlsx(file, range = cell_cols("A:O"),
           col_names = col_names, col_types = col_types) %>%
   filter(grepl("^\\d{5}", date)) %>%
   mutate(date = excel_numeric_to_date(as.numeric(date)),
-         time = format(as.POSIXct(Sys.Date() + as.numeric(time)), "%H:%M", tz="UTC")) %>%
+         time = format(as.POSIXct(Sys.Date() + as.numeric(time)), "%H:%M", tz="UTC"),
+         inst = ifelse(grepl("optima", file), "optima", "prism")) %>%
   select(-blank)
   
 }
