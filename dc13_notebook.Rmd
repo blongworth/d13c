@@ -195,4 +195,44 @@ ox %>%
             N = n())
 ```
 
+# Working with year-end IRMS files
+
+parse_irms_files.R reads in all of Al's year end irms files. This is the resulting dataset.
+
+```{r}
+irms <- read_csv("data/irms_data.csv") %>%
+  mutate(inst = factor(inst))
+skim(irms)
+```
+
+```{r}
+filter(irms, name == "INST3 GAS", !is.na(craigcor13c)) %>%
+  summarize(mean = mean(craigcor13c),
+            sd = sd(craigcor13c))
+
+filter(irms, name == "INST3 GAS", !is.na(craigcor13c)) %>%
+  ggplot(aes(date, craigcor13c, color = inst)) +
+           geom_point()
+```
+
+Generally pretty good, but what's with the future?
+
+```{r}
+filter(irms, name == "INST3 GAS",
+       !is.na(craigcor13c),
+       date > "2050-01-01")
+```
+
+Filtering out weird points...
+
+```{r}
+filter(irms, name == "INST3 GAS",
+       !is.na(craigcor13c),
+       date < "2050-01-01",
+       craigcor13c < -5) %>%
+  ggplot(aes(date, craigcor13c, color = inst)) +
+           geom_point()
+
+
+```
 
