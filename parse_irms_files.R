@@ -1,12 +1,22 @@
 # get data from files
+library(tidyverse)
 library(purrr)
 library(readxl)
+library(janitor)
 
 #directory for yearly dirs
-top_dir_path <- "H://arg/Mass Spec Data"
-files <- dir(path = top_dir_path, full.names = TRUE, recursive = TRUE, pattern = "*.xls")
+top_dir_path <- "H://arg/"
+files <- dir(path = top_dir_path, full.names = TRUE, recursive = FALSE, pattern = "[optima|PRISM]\\d{2}.xlsx")
 str(files)
 
-col_names <- c("date", "time", "index", "port", "name", "pres", "ref", "raw
-data <- read_xls(files[1])
-data
+col_names <- c("date", "time", "index", "name", "pres", "ref", "raw13c", 
+               "raw18o", "err13c", "err18o", "blank", "pdbcorr13c", 
+               "pdbcorr18o", "craigcor13c", "craigcor18o")
+data <- read_xlsx(files[1], range = cell_cols("A:O"), col_names = col_names)
+datafilt <- data %>%
+  select(date, time, name, craigcor13c) %>% 
+  filter(grepl("^\\d{5}", date)) %>%
+  mutate(date = excel_numeric_to_date(as.numeric(date)),
+         time = format(as.POSIXct(Sys.Date() + as.numeric(time)), "%H:%M", tz="UTC"))
+
+         
