@@ -38,7 +38,7 @@ readIRMSfile <- function(file) {
     mutate(date = excel_numeric_to_date(as.numeric(date)),
            time = format(as.POSIXct(Sys.Date() + as.numeric(time)), "%H:%M", tz="UTC"),
            inst = ifelse(grepl("optima", file), "optima", "prism")) %>%
-    select(date, time, index, name, pres, ref, craigcor13c)
+    select(date, time, inst, index, name, pres, ref, craigcor13c)
 }
          
 alldata <- map_dfr(files, readIRMSfile)
