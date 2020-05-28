@@ -1,5 +1,7 @@
 # get data for d13c analysis
 
+# TODO: add total sample size (small may fractionate in prep)
+
 library(tidyverse)
 library(DBI)
 library(glue)
