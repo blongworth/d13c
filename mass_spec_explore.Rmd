@@ -1,0 +1,58 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(amstools)
+library(DBI)
+```
+
+Create a database connection, and a dbplyr connection to mass_spec
+
+```{r}
+con <- conNOSAMS()
+mass_spec <- tbl(con, "mass_spec")
+```
+
+Check the data
+
+```{r}
+mass_spec %>% 
+  filter(ms_date > "2020-01-01") %>% 
+  head()
+```
+
+Look at histogram of beam size
+
+```{r}
+mass_spec %>% 
+  filter(beam_size > 0,
+         beam_size < 0.001) %>%
+  ggplot(aes(beam_size)) + geom_histogram()
+```
+
+Plot INST3 GAS
+
+```{r}
+mass_spec %>% 
+  filter(beam_size > 0,
+         beam_size < 0.001,
+         sample_desc == "INST3 GAS",
+         c13_cr_3std < 0) %>%
+  ggplot(aes(beam_size, c13_cr_3std)) + 
+           geom_point()
+```
+
+Check NBS-19
+
+```{r}
+mass_spec %>% 
+  filter(beam_size > 0,
+         beam_size < 0.001,
+         sample_desc == "NBS-19",
+         c13_cr_3std < 10) %>%
+  ggplot(aes(beam_size, c13_cr_3std)) + 
+           geom_point()
+```
