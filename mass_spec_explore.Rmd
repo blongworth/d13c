@@ -24,6 +24,18 @@ mass_spec %>%
   head()
 ```
 
+Having trouble finding standards by rec_num. Maybe a problem with the join to create mass_spec?
+
+```{r}
+mass_spec %>% 
+  group_by(rec_num) %>%
+  filter(n() > 1000) %>% 
+  summarize("d13C mean" = mean(c13_cr_3std),
+            "d13C sd" = sd(c13_cr_3std),
+            N = n())
+  
+```
+
 Look at histogram of beam size
 
 ```{r}
@@ -53,6 +65,17 @@ mass_spec %>%
          beam_size < 0.001,
          sample_desc == "NBS-19",
          c13_cr_3std < 10) %>%
+  ggplot(aes(beam_size, c13_cr_3std)) + 
+           geom_point()
+```
+Check C-2
+
+```{r}
+mass_spec %>% 
+  filter(beam_size > 0,
+         beam_size < 0.001,
+         rec_num == 1082,
+         c13_cr_3std > -7.5) %>%
   ggplot(aes(beam_size, c13_cr_3std)) + 
            geom_point()
 ```
