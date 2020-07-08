@@ -21,6 +21,7 @@ library(tidyverse)
 library(amstools)
 library(DBI)
 library(skimr)
+library(gt)
 ```
 
 Create a database connection, and a dbplyr connection to mass_spec
@@ -36,11 +37,17 @@ Join to standards table to select data with a consensus value
 
 ```{r}
 standards <- tbl(con, "standards")
-head(standards)
 
-standards
 d13c_data <- inner_join(mass_spec, standards) %>% 
-  select(rec_num, ms_date, sample_id, d13_cons, "d13_meas" = c13_cr_1std, beam_size, mass_spec)
+  select(rec_num, ms_date, sample_id, d13_cons, 
+         "d13_meas" = c13_cr_1std, beam_size, mass_spec) %>%
+  collect() 
+
+d13c_data <- d13c_data %>% 
+  group_by(rec_num) %>% 
+  filter(!is.na(d13_meas)) %>% 
+  mutate(outlier = is.na(removeOutliers(d13_meas))) %>% 
+  ungroup()
 
 head(d13c_data)
 
@@ -49,26 +56,27 @@ skim(d13c_data)
 ```
 
 
-Check the data. Does mass_spec match what's in the process tables?
-
-```{r}
-d13c_data %>% 
-  filter(ms_date > "2020-01-01") %>% 
-  head()
-```
-
-Having trouble finding standards by rec_num. Maybe a problem with the join to create mass_spec?
+Standards by rec num, outliers removed
 
 ```{r}
 d13c_data %>% 
   group_by(rec_num) %>%
-  filter(n() > 100) %>% 
-  summarize("d13C mean" = mean(d13_meas),
+  filter(n() > 100,
+         outlier == FALSE) %>% 
+  summarize(Name = first(sample_id),
+            "d13C mean" = mean(d13_meas),
             "d13C sd" = sd(d13_meas),
             N = n()) %>% 
-  gt::gt()
-  
+  arrange(desc(N))
 ```
+
+Try eliminating outliers using IQR
+
+```{r}
+
+```
+
+# Beam size vs precision/accuracy
 
 Look at histogram of beam size
 
@@ -82,11 +90,15 @@ mass_spec %>%
 Plot INST3 GAS
 
 ```{r}
-mass_spec %>% 
-  filter(beam_size > 0,
-         beam_size < 0.001,
-         sample_desc == "INST3 GAS",
-         c13_cr_3std < 0) %>%
+inst3gas <- mass_spec %>% 
+  filter(sample_desc == "INST3 GAS",
+         c13_cr_3std < 0) %>% 
+  mutate(outlier = is.na(removeOutliers(d13_meas)))
+
+inst3gas %>% 
+  summarize
+  
+
   ggplot(aes(beam_size, c13_cr_1std)) + 
            geom_point()
 ```
