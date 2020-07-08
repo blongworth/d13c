@@ -97,12 +97,14 @@ inst3gas <- mass_spec %>%
   mutate(outlier = is.na(removeOutliers(c13_cr_1std)))
 
 inst3gas %>% 
+  filter(outlier == FALSE) %>% 
   summarize("d13C mean" = mean(c13_cr_1std),
             "d13C sd" = sd(c13_cr_1std),
             N = n())
   
 
-  ggplot(aes(beam_size, c13_cr_1std)) + 
+inst3gas %>% 
+  ggplot(aes(beam_size, c13_cr_1std, color = outlier)) + 
            geom_point()
 ```
 
@@ -110,35 +112,32 @@ Check NBS-19
 
 ```{r}
 nbs19 <- mass_spec %>% 
-  filter(beam_size > 0,
-         beam_size < 0.001,
-         sample_desc %like% "NBS-19",
+  filter(sample_desc %like% "NBS-19",
          c13_cr_1std < 10) %>%
   collect() %>% 
   mutate(outlier = is.na(removeOutliers(c13_cr_1std)))
 
 nbs19 %>% 
+  filter(outlier == FALSE) %>% 
   summarize("d13C mean" = mean(c13_cr_1std),
             "d13C sd" = sd(c13_cr_1std),
             N = n())
-mass_spec %>% 
+
+nbs19 %>% 
   filter(beam_size > 0,
-         beam_size < 0.001,
-         sample_desc %like% "NBS-19",
-         c13_cr_3std < 10) %>%
-  ggplot(aes(beam_size, c13_cr_1std)) + 
+         beam_size < 0.001) %>%
+  ggplot(aes(beam_size, c13_cr_1std, color = outlier)) + 
            geom_point()
 ```
 
 Check C-2
 
 ```{r}
-mass_spec %>% 
+d13c_data %>% 
   filter(beam_size > 0,
          beam_size < 0.001,
-         rec_num == 1082,
-         c13_cr_3std > -7.5) %>%
-  ggplot(aes(beam_size, c13_cr_1std)) + 
+         rec_num == 1082) %>%
+  ggplot(aes(beam_size, d13_meas, color = outlier)) + 
            geom_point()
 ```
 
