@@ -93,10 +93,13 @@ Plot INST3 GAS
 inst3gas <- mass_spec %>% 
   filter(sample_desc == "INST3 GAS",
          c13_cr_3std < 0) %>% 
-  mutate(outlier = is.na(removeOutliers(d13_meas)))
+  collect() %>% 
+  mutate(outlier = is.na(removeOutliers(c13_cr_1std)))
 
 inst3gas %>% 
-  summarize
+  summarize("d13C mean" = mean(c13_cr_1std),
+            "d13C sd" = sd(c13_cr_1std),
+            N = n())
   
 
   ggplot(aes(beam_size, c13_cr_1std)) + 
@@ -106,6 +109,18 @@ inst3gas %>%
 Check NBS-19
 
 ```{r}
+nbs19 <- mass_spec %>% 
+  filter(beam_size > 0,
+         beam_size < 0.001,
+         sample_desc %like% "NBS-19",
+         c13_cr_1std < 10) %>%
+  collect() %>% 
+  mutate(outlier = is.na(removeOutliers(c13_cr_1std)))
+
+nbs19 %>% 
+  summarize("d13C mean" = mean(c13_cr_1std),
+            "d13C sd" = sd(c13_cr_1std),
+            N = n())
 mass_spec %>% 
   filter(beam_size > 0,
          beam_size < 0.001,
