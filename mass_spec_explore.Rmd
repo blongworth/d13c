@@ -1,22 +1,25 @@
 ---
-title: "Untitled"
+title: "NOSAMS δ^13^C"
 output: html_document
 ---
 
 TODO:
 
-* Join with process tables to get d13C qty, etc.
+* Join with process tables to get δ^13^C qty, etc.
 
-Some questions:
+Some questions (with current answers):
 
 * Do the data in mass_spec match those in the process tables?
-* Does irms sample size affect precision or ratio?
-* How should we eliminate outliers to get at the precision and accuracy of d13C?
-* What samples should we use to estimate IRMS precision and accuracy?
-* What samples should we use to estimate the same for the entire process?
-* What can d13C tell us about fractionation in sample prep processes?
+* Does irms sample size affect precision or ratio? Not really. Still need to investigate ratio vs d13C split size and total sample size.
+* How should we eliminate outliers to get at the precision and accuracy of d13C? Currently using 1.5 * IQR outside of 1st and 3rd quartiles.
+* What samples should we use to estimate IRMS precision and accuracy? Using INST3 GAS and NBS-19.
+* What samples should we use to estimate the same for the entire process? Using all samples in standards table.
+* What can d13C tell us about fractionation in sample prep processes? There seems to be differences in SD between OC and HY samples. Need to add process codes.
 
-```{r}
+
+## Load libraries
+
+```{r, message = FALSE, warning = FALSE}
 library(tidyverse)
 library(amstools)
 library(DBI)
@@ -24,56 +27,114 @@ library(skimr)
 library(gt)
 ```
 
+## Gather data
+
 Create a database connection, and a dbplyr connection to mass_spec
 
 ```{r}
 con <- conNOSAMS()
 mass_spec <- tbl(con, "mass_spec")
-head(mass_spec)
-str(mass_spec)
 ```
 
-Join to standards table to select data with a consensus value
+Join to standards table to select standards. Some of these have a d13_cons value listed. Samples that are more than 1.5 * IQR above the first quartile or more than 1.5 * IQR below the third quartile are flagged as potential outliers. These statistics are calculated per rec_num.
 
 ```{r}
 standards <- tbl(con, "standards")
-
 d13c_data <- inner_join(mass_spec, standards) %>% 
-  select(rec_num, ms_date, sample_id, d13_cons, 
+  select(rec_num, ms_date, sample_num, sample_desc, sample_id, d13_cons, pres_rms, 
          "d13_meas" = c13_cr_1std, beam_size, mass_spec) %>%
   collect() 
 
+# Add outlier flagging
 d13c_data <- d13c_data %>% 
   group_by(rec_num) %>% 
   filter(!is.na(d13_meas)) %>% 
   mutate(outlier = is.na(removeOutliers(d13_meas))) %>% 
-  ungroup()
-
-head(d13c_data)
-
-tally(d13c_data)
-skim(d13c_data)
+  ungroup() %>% 
+  mutate(sample_type = ifelse(str_sub(sample_desc, 1, 2) %in% c("OC", "HY", "GS", "WS", "DO"), 
+                              str_sub(sample_desc, 1, 2), 
+                              NA))
 ```
 
+## Table of standards
 
-Standards by rec num, outliers removed
+The table below has all standards measured more than 10 times. Outliers by IQR (see above) are not included.
 
 ```{r}
-d13c_data %>% 
-  group_by(rec_num) %>%
-  filter(n() > 100,
+d13c_summary <- d13c_data %>% 
+  group_by(sample_type, rec_num) %>%
+  filter(n() > 10,
          outlier == FALSE) %>% 
-  summarize(Name = first(sample_id),
-            "d13C mean" = mean(d13_meas),
-            "d13C sd" = sd(d13_meas),
+  summarize(Name = str_trim(first(sample_id), side = "left"), #remove whitespace to list OX together
+            "Consensus d13C" = first(d13_cons),
+            "d13C_mean" = mean(d13_meas),
+            "d13C_sd" = sd(d13_meas),
             N = n()) %>% 
-  arrange(desc(N))
+  arrange(Name) 
+
+d13c_summary %>% 
+  gt() %>%
+  fmt_number(
+    columns = 5:6,
+    decimals = 2,
+    use_seps = FALSE
+  ) %>% 
+  tab_header(title = html("δ<sup>13</sup>C of NOSAMS and external standards"))
+
 ```
 
-Try eliminating outliers using IQR
+
+The average SD of IRMS samples grouped by rec_num is `r mean(d13c_summary$d13C_sd)`. This includes all samples with a rec_num in the standards table and with outliers removed groupwise by IQR. 
+
+## IRMS standards
+
+Below are data for INST3 GAS and NBS-19. INST3 GAS is an internal standard and has no inter-lab consensus value. The consensus value for NBS-19 is 1.95 ‰ (doi:10.1515/pac-2013-1023). This paper by T. Coplen et. al has a bunch of other consensus values as well.
+
+### INST3 GAS
 
 ```{r}
+inst3gas <- mass_spec %>% 
+  filter(sample_desc == "INST3 GAS",
+         !is.na(c13_cr_1std)) %>% 
+  collect() %>% 
+  mutate(outlier = is.na(removeOutliers(c13_cr_1std)))
 
+inst3gas %>% 
+  filter(outlier == FALSE) %>% 
+  summarize("d13C mean" = mean(c13_cr_1std),
+            "d13C sd" = sd(c13_cr_1std),
+            N = n()) %>% 
+  gt %>% 
+  fmt_number(
+    columns = 1:2,
+    decimals = 2,
+    use_seps = FALSE
+  ) %>% 
+  tab_header(title = "INST3 GAS")
+```
+
+
+### NBS-19
+
+```{r}
+nbs19 <- mass_spec %>% 
+  filter(sample_desc %like% "NBS-19") %>%
+  collect() %>% 
+  mutate(outlier = is.na(removeOutliers(c13_cr_1std)))
+
+nbs19 %>% 
+  filter(outlier == FALSE) %>% 
+  summarize("Consensus d13C" = 1.95,
+            "d13C mean" = mean(c13_cr_1std),
+            "d13C sd" = sd(c13_cr_1std),
+            N = n()) %>% 
+  gt %>% 
+  fmt_number(
+    columns = 2:3,
+    decimals = 2,
+    use_seps = FALSE
+  ) %>% 
+  tab_header(title = "NBS-19")
 ```
 
 # Beam size vs precision/accuracy
@@ -87,79 +148,27 @@ mass_spec %>%
   ggplot(aes(beam_size)) + geom_histogram()
 ```
 
-Plot INST3 GAS
+
+INST3 Gas ratio vs beam size
 
 ```{r}
-inst3gas <- mass_spec %>% 
-  filter(sample_desc == "INST3 GAS",
-         c13_cr_3std < 0) %>% 
-  collect() %>% 
-  mutate(outlier = is.na(removeOutliers(c13_cr_1std)))
-
 inst3gas %>% 
-  filter(outlier == FALSE) %>% 
-  summarize("d13C mean" = mean(c13_cr_1std),
-            "d13C sd" = sd(c13_cr_1std),
-            N = n())
-  
-
-inst3gas %>% 
+  filter(beam_size > 0,
+         beam_size < 0.001,
+         c13_cr_1std < -2) %>%
   ggplot(aes(beam_size, c13_cr_1std, color = outlier)) + 
            geom_point()
 ```
 
-Check NBS-19
+NBS-19 ratio vs beam size
 
 ```{r}
-nbs19 <- mass_spec %>% 
-  filter(sample_desc %like% "NBS-19",
-         c13_cr_1std < 10) %>%
-  collect() %>% 
-  mutate(outlier = is.na(removeOutliers(c13_cr_1std)))
-
-nbs19 %>% 
-  filter(outlier == FALSE) %>% 
-  summarize("d13C mean" = mean(c13_cr_1std),
-            "d13C sd" = sd(c13_cr_1std),
-            N = n())
-
 nbs19 %>% 
   filter(beam_size > 0,
-         beam_size < 0.001) %>%
+         beam_size < 0.001,
+         c13_cr_1std < 5,
+         c13_cr_1std > -1) %>%
   ggplot(aes(beam_size, c13_cr_1std, color = outlier)) + 
            geom_point()
 ```
 
-Check C-2
-
-```{r}
-d13c_data %>% 
-  filter(beam_size > 0,
-         beam_size < 0.001,
-         rec_num == 1082) %>%
-  ggplot(aes(beam_size, d13_meas, color = outlier)) + 
-           geom_point()
-```
-
-NOSAMS-2
-```{r}
-mass_spec %>% 
-  filter(beam_size > 0,
-         beam_size < 0.001,
-         rec_num == 38809,
-         c13_cr_3std > -7.5) %>%
-  ggplot(aes(beam_size, c13_cr_1std)) + 
-           geom_point()
-```
-
-Check C-1
-
-```{r}
-mass_spec %>% 
-  filter(beam_size > 0,
-         beam_size < 0.001,
-         rec_num == 1081,
-         c13_cr_3std > -7.5) %>%
-  ggplot(aes(beam_size, c13_cr_1std)) + 
-           geom_point()
-```
