@@ -29,6 +29,7 @@ load libraries
 library(tidyverse)
 library(skimr)
 library(amstools)
+library(DBI)
 ```
 
 Load the data and summarize.
@@ -221,6 +222,7 @@ ox %>%
             N = n())
 ```
 
+
 # Working with year-end IRMS files
 
 parse_irms_files.R reads in all of Al's year end irms files. This is the resulting dataset.
@@ -260,5 +262,15 @@ filter(irms, name == "INST3 GAS",
            geom_point()
 
 
+```
+
+# Mass Spec table
+
+Check out mass spec table
+
+```{r}
+con <- conNOSAMS()
+dbListFields(con, "mass_spec")
+mass_spec <- dbGetQuery(con, "select * from mass_spec")
 ```
 
