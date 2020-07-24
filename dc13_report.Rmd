@@ -29,6 +29,7 @@ load libraries
 library(tidyverse)
 library(skimr)
 library(amstools)
+library(gt)
 ```
 
 Let's start from rec_nums that are in the standards table, and then pull relevant corresponding data from the process tables. This has been transferred to get_d13c_data.R...
@@ -40,13 +41,33 @@ load("data/NOSAMS_d13c.rda")
 skim(data)
 ```
 
-Remove samples marked r&d
+
+## Table of standards
+
+The table below has all standards measured more than 10 times. Outliers by IQR (see above) are not included.
 
 ```{r}
-data <- data %>%
-  filter(rd == 0)
-```
+d13c_summary <- data %>% 
+  group_by(rec_num) %>%
+  filter(n() > 10,
+         outlier == FALSE) %>% 
+  summarize(Name = str_trim(first(sample_id), side = "left"), #remove whitespace to list OX together
+            "Consensus d13C" = first(d13_cons),
+            "d13C_mean" = mean(d13c),
+            "d13C_sd" = sd(d13c),
+            N = n()) %>% 
+  arrange(Name) 
 
+d13c_summary %>% 
+  gt() %>%
+  fmt_number(
+    columns = 4:5,
+    decimals = 2,
+    use_seps = FALSE
+  ) %>% 
+  tab_header(title = html("δ<sup>13</sup>C of NOSAMS and external standards"))
+
+```
 Find the sample types run the most.
 
 ```{r}
