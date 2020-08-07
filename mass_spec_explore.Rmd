@@ -6,15 +6,16 @@ output: html_document
 TODO:
 
 * Join with process tables to get δ^13^C qty, etc.
+* Intermediate product: table of most commonly run secondaries, plot of same as boxplots
 
 Some questions (with current answers):
 
 * Do the data in mass_spec match those in the process tables?
-* Does irms sample size affect precision or ratio? Not really. Still need to investigate ratio vs d13C split size and total sample size.
+* Does irms sample size affect precision or ratio? Not really. Still need to investigate ratio vs δ<sup>13</sup>C split size and total sample size.
 * How should we eliminate outliers to get at the precision and accuracy of d13C? Currently using 1.5 * IQR outside of 1st and 3rd quartiles.
 * What samples should we use to estimate IRMS precision and accuracy? Using INST3 GAS and NBS-19.
 * What samples should we use to estimate the same for the entire process? Using all samples in standards table.
-* What can d13C tell us about fractionation in sample prep processes? There seems to be differences in SD between OC and HY samples. Need to add process codes.
+* What can δ<sup>13</sup>C tell us about fractionation in sample prep processes? There seems to be differences in SD between OC and HY samples. Need to add process codes.
 
 
 ## Load libraries
@@ -63,7 +64,7 @@ The table below has all standards measured more than 10 times. Outliers by IQR (
 ```{r}
 d13c_summary <- d13c_data %>% 
   group_by(sample_type, rec_num) %>%
-  filter(n() > 10,
+  filter(n() > 200,
          outlier == FALSE) %>% 
   summarize(Name = str_trim(first(sample_id), side = "left"), #remove whitespace to list OX together
             "Consensus d13C" = first(d13_cons),

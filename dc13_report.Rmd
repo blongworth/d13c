@@ -59,6 +59,7 @@ d13c_summary <- data %>%
   arrange(Name) 
 
 d13c_summary %>% 
+  group_by()
   gt() %>%
   fmt_number(
     columns = 4:5,

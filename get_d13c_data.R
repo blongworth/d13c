@@ -9,8 +9,6 @@ library(amstools)
 library(here)
 
 
-# Use amstools to get the standards table
-standards <- getStdTable()
 
 # a function to grab data for a list of rec_nums from the gs table
 # this would probably be simpler as 4 separate queries.
@@ -28,7 +26,6 @@ get13c <- function(type, recnums) {
                                     {type}_num, rec_num, 
                                     {type}_date AS date, 
                                     {type}_rd AS rd, 
-                                    {type}_dc_13 AS d13c, 
                                     {type}_dc_13 AS d13c, 
                                     {type}_c13_yield AS c13qty, 
                                     {type}_co2_yield AS tot_qty, 
@@ -79,15 +76,29 @@ get13c <- function(type, recnums) {
   data
 }
 
+
+# get the standards table
+db <- conNOSAMS()
+standards <- dbGetQuery(db, "SELECT * FROM standards")
+
+# get all d13C with rec_num in standards table
 data <- map_dfr(list("hy", "gs", "oc", "ws"), get13c, standards$rec_num)
 
-# Remove bad or empty irms and date, recode rd
+# Remove bad or empty irms and date, recode rd, flag outliers, add process
 data <- data %>%
   filter(irms %in% c("O", "P"),
          !is.na(date)) %>%
   mutate(date = as.Date(date),
          rd = factor(ifelse(is.na(rd), 0, rd)),
+         #sample_type = map_chr(tp_num, getProcess, con),
          irms = factor(irms)) %>%
-  inner_join(select(standards, rec_num, name))
+  group_by(rec_num) %>% 
+  filter(!is.na(d13c)) %>% 
+  mutate(outlier = is.na(removeOutliers(d13c))) %>% 
+  ungroup() %>% 
+  inner_join(select(standards, rec_num, sample_id, d13_cons))
+
+
+
 save(list = c("data", "standards"), file = "data/NOSAMS_d13c.rda")
-write_csv(data, here("data/NOSAMS_d13c.csv"))
+write_csv(data, here("data/NOSAMS_proc_d13c.csv"))
